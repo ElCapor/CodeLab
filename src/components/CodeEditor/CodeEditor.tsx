@@ -15,6 +15,7 @@ import {
     getLanguageExtension,
     createSearchExtension,
     openSearchPanel,
+    createDiagnosticsExtension,
 } from './extensions'
 import { undo, redo } from '@codemirror/commands'
 
@@ -41,6 +42,7 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEdito
         lineWrapping = false,
         highlightActiveLine = true,
         showSearch = true,
+        showDiagnostics = true,
         className = '',
         minHeight = '200px',
         maxHeight,
@@ -82,6 +84,9 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEdito
 
             // Search functionality
             ...(showSearch ? createSearchExtension() : []),
+
+            // Diagnostics (Linter)
+            ...(showDiagnostics ? [createDiagnosticsExtension()] : []),
 
             // Line wrapping
             ...(lineWrapping ? [EditorView.lineWrapping] : []),

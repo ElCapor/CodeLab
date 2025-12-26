@@ -71,6 +71,10 @@ export interface CodeEditorProps {
     highlightActiveLine?: boolean
     /** Whether to show the search panel */
     showSearch?: boolean
+    /** Whether to enable AI completion (Ghost Text) */
+    showAI?: boolean
+    /** Whether to show diagnostics (Linter) */
+    showDiagnostics?: boolean
     /** Custom class name for the container */
     className?: string
     /** Minimum height of the editor */

@@ -17,3 +17,7 @@ export type {
     EditorStateShape,
     EditorAction,
 } from './state'
+
+// Security
+export { Sanitizer, defaultSanitizer } from './security/Sanitizer'
+export * from './security/sanitizerRules'

@@ -20,3 +20,5 @@ export {
     replaceAll,
     selectMatches,
 } from './searchExtension'
+export { createCompletionExtension, setGhostText } from './completionExtension'
+export { createDiagnosticsExtension } from './diagnosticsExtension'
