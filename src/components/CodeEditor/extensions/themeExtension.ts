@@ -15,6 +15,7 @@ const defaultTheme: Required<EditorTheme> = {
     lineNumbers: '#475569', // slate-600
     activeLine: 'rgba(255, 255, 255, 0.03)',
     matchingBracket: 'rgba(56, 189, 248, 0.3)',
+    fontSize: 13,
 }
 
 /**
@@ -31,7 +32,7 @@ export function createThemeExtension(theme: EditorTheme = {}): Extension {
         '.cm-content': {
             caretColor: merged.cursor,
             fontFamily: 'var(--font-mono)',
-            fontSize: '13px',
+            fontSize: merged.fontSize ? `${merged.fontSize}px` : '13px',
             lineHeight: '1.7',
             padding: '10px 0',
         },

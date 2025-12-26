@@ -5,35 +5,49 @@
    ============================================ */
 
 :root {
-  /* Ultra-Premium Dark Palette */
-  --bg-main: #020617;
-  /* Deepest Indigo/Black */
-  --bg-card: #0f172a;
-  --bg-sidebar: rgba(15, 23, 42, 0.7);
-  --bg-hover: rgba(51, 65, 85, 0.4);
+  /* Dynamic Semantic Tokens (Themed) */
+  --cl-bg-main: #020617;
+  --cl-bg-card: rgba(15, 23, 42, 0.4);
+  --cl-bg-sidebar: rgba(15, 23, 42, 0.8);
+  --cl-bg-toolbar: rgba(15, 23, 42, 0.6);
+  --cl-bg-hover: rgba(51, 65, 85, 0.3);
 
-  --border-glass: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.15);
+  --cl-border: rgba(255, 255, 255, 0.08);
+  --cl-border-hover: rgba(56, 189, 248, 0.3);
 
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --text-dim: #475569;
+  --cl-text-main: #f8fafc;
+  --cl-text-muted: #94a3b8;
+  --cl-text-dim: #475569;
 
-  --brand-primary: #38bdf8;
-  /* Sky Blue */
-  --brand-secondary: #818cf8;
-  /* Indigo */
-  --brand-glow: rgba(56, 189, 248, 0.15);
-  --brand-success: #10b981;
+  --cl-accent: #38bdf8;
+  --cl-accent-secondary: #818cf8;
+  --cl-accent-glow: rgba(56, 189, 248, 0.15);
 
-  /* Typography */
+  /* Static Utility Tokens */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-
-  /* Effects */
   --glass-blur: blur(12px);
-  --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   --shadow-premium: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --transition-theme: background 0.5s ease, color 0.5s ease, border 0.5s ease;
+}
+
+[data-theme='light'] {
+  --cl-bg-main: #f8fafc;
+  --cl-bg-card: rgba(255, 255, 255, 0.8);
+  --cl-bg-sidebar: rgba(241, 245, 249, 0.9);
+  --cl-bg-toolbar: rgba(226, 232, 240, 0.8);
+  --cl-bg-hover: rgba(203, 213, 225, 0.5);
+
+  --cl-border: rgba(0, 0, 0, 0.08);
+  --cl-border-hover: rgba(56, 189, 248, 0.5);
+
+  --cl-text-main: #0f172a;
+  --cl-text-muted: #475569;
+  --cl-text-dim: #94a3b8;
+
+  --cl-accent: #0ea5e9;
+  --cl-accent-secondary: #6366f1;
+  --cl-accent-glow: rgba(14, 165, 233, 0.1);
 }
 
 /* ============================================
@@ -50,14 +64,14 @@ body {
   margin: 0;
   padding: 0;
   font-family: var(--font-sans);
-  background-color: var(--bg-main);
+  background-color: var(--cl-bg-main);
   background-image:
     radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.05) 0px, transparent 50%),
     radial-gradient(at 100% 100%, rgba(129, 140, 248, 0.05) 0px, transparent 50%);
-  color: var(--text-primary);
+  color: var(--cl-text-main);
   overflow: hidden;
-  /* IDE layout handled by flex/grid */
   height: 100vh;
+  transition: var(--transition-theme);
 }
 
 #root {
@@ -71,44 +85,32 @@ body {
    ============================================ */
 
 .glass-panel {
-  background: var(--bg-sidebar);
+  background: var(--cl-bg-sidebar);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--cl-border);
+  transition: var(--transition-theme);
 }
 
 .glass-card {
-  background: rgba(30, 41, 59, 0.5);
+  background: var(--cl-bg-card);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid var(--border-glass);
+  border: 1px solid var(--cl-border);
   box-shadow: var(--shadow-premium);
+  transition: var(--transition-theme);
 }
 
 .glow-border {
-  border: 1px solid var(--border-glass);
-  transition: var(--transition-smooth);
+  border: 1px solid var(--cl-border);
+  transition: all 0.3s ease;
 }
 
 .glow-border:hover {
-  border-color: rgba(56, 189, 248, 0.4);
+  border-color: var(--cl-border-hover);
   box-shadow: 0 0 20px rgba(56, 189, 248, 0.1);
 }
 
 /* ============================================
-   Focus & Selection Redux
-   ============================================ */
-
-::selection {
-  background-color: rgba(56, 189, 248, 0.3);
-  color: inherit;
-}
-
-:focus-visible {
-  outline: 2px solid var(--brand-primary);
-  outline-offset: 2px;
-}
-
-/* ============================================
-   Custom Scrollbar (Minimalist & Premium)
+   Custom Scrollbar
    ============================================ */
 
 ::-webkit-scrollbar {
@@ -121,12 +123,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-dim);
+  background: var(--cl-text-dim);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: var(--cl-text-muted);
 }
 
 /* ============================================
@@ -148,13 +150,35 @@ body {
 .animate-in {
   animation: fadeIn 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
+
 /* Ghost Text Animation */
 @keyframes ghost-fade-in {
-    from { opacity: 0; transform: translateX(-2px); }
-    to { opacity: 0.7; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-2px);
+  }
+
+  to {
+    opacity: 0.7;
+    transform: translateX(0);
+  }
 }
 
 .cm-ghost-text {
-    animation: ghost-fade-in 0.3s ease-out forwards;
-    white-space: pre;
+  animation: ghost-fade-in 0.3s ease-out forwards;
+  white-space: pre;
+}
+
+/* ============================================
+   Resizer Styles
+   ============================================ */
+
+.resizer-handle {
+  background-color: var(--cl-border);
+  transition: background-color 0.2s ease;
+}
+
+.resizer-handle:hover,
+.resizer-handle[data-active] {
+  background-color: var(--cl-accent);
 }

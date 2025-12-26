@@ -4,35 +4,80 @@ import {
     Sandbox,
     Sidebar,
     Breadcrumbs,
-    IsolatedEditor,
-    CommandPalette
+    CommandPalette,
+    SettingsPanel,
+    Resizer
 } from '@/components'
-import { useCodeEditor, useStateEngine, useSandbox, useAI } from '@/hooks'
+import { useCodeEditor, useStateEngine, useSandbox, useAI, useLayout } from '@/hooks'
 import { createEditorStateEngine } from '@/lib/state'
 import { defaultSanitizer, standardSecurityPipeline } from '@/lib'
 import { createCompletionExtension, setGhostText } from '@/components/CodeEditor/extensions'
+import { Group, Panel } from 'react-resizable-panels'
+import { ThemeEngine, Theme } from '@/lib/theming/ThemeEngine'
 
-const SAMPLE_CODE = `// Phase 3: Intelligence & Protocols 🧠
-// Try typing 'const' or 'function' to see ghost suggestions!
+const SAMPLE_CODE = `// Phase 4: Stability & Responsiveness 🚀
+// Try resizing your browser window or dragging panels!
 
-function greet() {
-  const name = "Developer";
-  return \`Hello \${name}! This is agentic intelligence.\`;
+function stabilityTest() {
+  console.log("UI Shaking: RESOLVED");
+  console.log("Orientation: ADAPTIVE");
+  return "Enjoy the flicker-free experience.";
 }
 
-// TODO: Implement real-time LSP protocols
-console.log(greet());
+stabilityTest();
 `
 
 const LANGUAGES = ['typescript', 'javascript', 'html', 'css', 'json', 'markdown'] as const
 
 function App() {
-    const [code, setCode] = useState(SAMPLE_CODE)
-    const [language, setLanguage] = useState<typeof LANGUAGES[number]>('typescript')
-    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
-    const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('codelab_gemini_key') || '')
+    const [settings, setSettings] = useState(() => {
+        const saved = localStorage.getItem('codelab_settings')
+        return saved ? JSON.parse(saved) : {
+            autocomplete: true,
+            defaultFontSize: 14,
+            defaultLanguage: 'typescript' as const,
+            theme: 'dark' as Theme
+        }
+    })
 
-    // Persist API key
+    const [code, setCode] = useState(SAMPLE_CODE)
+    const [language, setLanguage] = useState<typeof LANGUAGES[number]>(settings.defaultLanguage)
+    const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false)
+    const [fontSize, setFontSize] = useState(settings.defaultFontSize)
+    const [geminiApiKey, setGeminiApiKey] = useState(() => localStorage.getItem('codelab_gemini_key') || '')
+    const [activeTab, setActiveTab] = useState('files')
+
+    // Adaptive Orientation Logic
+    const [isVertical, setIsVertical] = useState(() => window.innerWidth < 768)
+    useEffect(() => {
+        const handleResize = () => setIsVertical(window.innerWidth < 768)
+        window.addEventListener('resize', handleResize)
+        return () => window.removeEventListener('resize', handleResize)
+    }, [])
+
+    // Ultra-stable Layout Persistence
+    const { layoutStorage, STORAGE_ID } = useLayout()
+
+    // Sync Settings & Theme
+    useEffect(() => {
+        localStorage.setItem('codelab_settings', JSON.stringify(settings))
+        if (settings.theme) {
+            ThemeEngine.setTheme(settings.theme)
+        }
+    }, [settings])
+
+    useEffect(() => {
+        ThemeEngine.initialize()
+    }, [])
+
+    useEffect(() => {
+        setFontSize(settings.defaultFontSize)
+    }, [settings.defaultFontSize])
+
+    useEffect(() => {
+        setLanguage(settings.defaultLanguage)
+    }, [settings.defaultLanguage])
+
     useEffect(() => {
         if (geminiApiKey) localStorage.setItem('codelab_gemini_key', geminiApiKey)
         else localStorage.removeItem('codelab_gemini_key')
@@ -51,17 +96,15 @@ function App() {
         clearSuggestion
     } = useAI(geminiApiKey)
 
-    // Manual AI trigger callback
     const triggerAI = useCallback(() => {
         const view = getView()
         if (view) {
             const pos = view.state.selection.main.head
             const context = view.state.doc.toString()
-            requestSuggestion(context, pos, true)
+            requestSuggestion(context, pos, true, language)
         }
-    }, [getView, requestSuggestion])
+    }, [getView, requestSuggestion, language])
 
-    // State Engine
     const editorEngine = useMemo(() => createEditorStateEngine({
         content: SAMPLE_CODE,
         language: 'typescript',
@@ -69,31 +112,16 @@ function App() {
 
     const { canUndo, canRedo, undo, redo } = useStateEngine(editorEngine)
 
-    // Completion Extension with callbacks
     const completionExt = useMemo(() => createCompletionExtension({
-        onAccept: () => handleAccept(),
-        onReject: () => handleReject(),
-        onManualTrigger: () => triggerAI(),
+        onAccept: handleAccept,
+        onReject: handleReject,
+        onManualTrigger: triggerAI,
     }), [handleAccept, handleReject, triggerAI])
 
-    // Sanitizer Setup
     useEffect(() => {
         standardSecurityPipeline.forEach(rule => defaultSanitizer.use(rule))
     }, [])
 
-    // Global Keybindings (Cmd+K)
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
-                e.preventDefault()
-                setIsCommandPaletteOpen(prev => !prev)
-            }
-        }
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [])
-
-    // Sync AI suggestions with Editor Ghost Text
     useEffect(() => {
         const view = getView()
         if (view) {
@@ -105,253 +133,216 @@ function App() {
 
     const handleCodeChange = useCallback((newCode: string) => {
         setCode(newCode)
-
-        // Trigger AI thinking as the user types
+        if (!settings.autocomplete) return
         const view = getView()
         if (view) {
             const pos = view.state.selection.main.head
-            requestSuggestion(newCode, pos)
+            requestSuggestion(newCode, pos, false, language)
         }
-    }, [getView, requestSuggestion])
+    }, [getView, requestSuggestion, language, settings.autocomplete])
 
     const handleAction = (type: string) => {
         switch (type) {
             case 'search': openSearch(); break;
             case 'undo': if (canUndo) { undo(); editorUndo(); } break;
             case 'redo': if (canRedo) { redo(); editorRedo(); } break;
-            case 'run':
-                const safeCode = defaultSanitizer.sanitize(code)
-                execute(safeCode)
-                break;
+            case 'run': execute(defaultSanitizer.sanitize(code)); break;
             case 'clear_ai': clearSuggestion(); break;
         }
     }
 
     const commands = [
-        { id: 'run', name: 'Run Code Securely', description: 'Execute the current buffer in the sandbox', shortcut: '⌘R', action: () => handleAction('run') },
-        { id: 'search', name: 'Search & Replace', description: 'Open the global search panel', shortcut: '⌘F', action: () => handleAction('search') },
+        { id: 'run', name: 'Run Code Securely', description: 'Execute the current buffer', shortcut: '⌘R', action: () => handleAction('run') },
+        { id: 'search', name: 'Search & Replace', description: 'Open search panel', shortcut: '⌘F', action: () => handleAction('search') },
         { id: 'undo', name: 'Undo Change', description: 'Revert last edit', shortcut: '⌘Z', action: () => handleAction('undo') },
         { id: 'redo', name: 'Redo Change', description: 'Apply next edit', shortcut: '⇧⌘Z', action: () => handleAction('redo') },
+        { id: 'predict', name: 'Predict Next Steps', description: 'Manual AI trigger', shortcut: '⌥\\', action: triggerAI },
         {
-            id: 'predict',
-            name: 'Predict Next Steps',
-            description: 'Manually trigger AI code completion',
-            shortcut: '⌥\\',
-            action: () => triggerAI()
+            id: 'theme_toggle',
+            name: 'Toggle Theme',
+            description: 'Switch between light and dark mode',
+            action: () => setSettings((s: any) => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))
         },
         {
             id: 'set_gemini',
             name: 'Set Gemini API Key',
-            description: 'Configure your Google Gemini API key for agentic completion',
+            description: 'Configure API key',
             action: () => {
                 const key = prompt('Enter your Google Gemini API Key:', geminiApiKey)
                 if (key !== null) setGeminiApiKey(key)
             }
         },
+        { id: 'font_inc', name: 'Increase Font Size', shortcut: '⌘+', action: () => setFontSize((s: number) => Math.min(s + 1, 32)) },
+        { id: 'font_dec', name: 'Decrease Font Size', shortcut: '⌘-', action: () => setFontSize((s: number) => Math.max(s - 1, 8)) },
     ]
 
     return (
-        <>
-            <Sidebar />
+        <Group
+            autoSaveId={STORAGE_ID}
+            storage={layoutStorage}
+            orientation={isVertical ? "vertical" : "horizontal"}
+            className="h-full w-full bg-slate-950"
+        >
+            {/* Sidebar Panel */}
+            <Panel
+                id="sidebar"
+                order={1}
+                collapsible
+                minSize={isVertical ? 5 : 5}
+                maxSize={isVertical ? 40 : 40}
+                defaultSize={20}
+                className="z-10"
+            >
+                <div className="h-full w-full md:p-0">
+                    <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+                </div>
+            </Panel>
 
-            <main className="flex-1 flex flex-col h-full overflow-hidden bg-transparent animate-in">
-                <header className="flex h-12 items-center justify-between border-b border-white/5 bg-slate-900/40 px-4 backdrop-blur-md">
-                    <div className="flex items-center gap-4">
-                        <h2 className="text-sm font-semibold tracking-wide text-slate-100 uppercase italic">CodeLab</h2>
-                        <div className="h-4 w-px bg-white/10" />
-                        <Breadcrumbs language={language} />
-                    </div>
+            <Resizer direction={isVertical ? "vertical" : "horizontal"} />
 
-                    <div className="flex items-center gap-3">
-                        {!geminiApiKey && (
+            {/* Main Area */}
+            <Panel id="main" order={2} className="flex flex-col h-full overflow-hidden">
+                <main className="flex-1 flex flex-col h-full overflow-hidden bg-transparent">
+                    {/* Header */}
+                    <header className="flex h-12 flex-shrink-0 items-center justify-between border-b border-white/5 bg-slate-900/40 px-4 backdrop-blur-md">
+                        <div className="flex items-center gap-4">
+                            <h2 className="text-sm font-semibold tracking-wide text-slate-100 uppercase italic">CodeLab</h2>
+                            <div className="hidden sm:block h-4 w-px bg-white/10" />
+                            <div className="hidden sm:block"><Breadcrumbs language={language} /></div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
                             <button
                                 onClick={() => setIsCommandPaletteOpen(true)}
-                                className="flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-all"
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all text-slate-300 hover:text-white"
                             >
-                                <div className="h-2 w-2 rounded-full bg-amber-400" />
-                                <span className="text-[10px] font-bold text-amber-400 uppercase tracking-widest leading-none">Gemini Missing</span>
+                                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                                <span className="hidden md:inline text-[10px] font-bold uppercase tracking-wider">Commands</span>
                             </button>
-                        )}
-                        {geminiApiKey && aiError && (
-                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/10 border border-rose-500/20">
-                                <div className="h-2 w-2 rounded-full bg-rose-400 animate-pulse" />
-                                <span className="text-[10px] font-bold text-rose-400 uppercase tracking-widest leading-none">Rate Limited</span>
-                            </div>
-                        )}
-                        {geminiApiKey && isThinking && !aiError && (
-                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-sky-500/10 border border-sky-500/20 animate-pulse">
-                                <div className="h-2 w-2 rounded-full bg-sky-400" />
-                                <span className="text-[10px] font-bold text-sky-400 uppercase tracking-widest leading-none">Thinking...</span>
-                            </div>
-                        )}
-                        {geminiApiKey && !isThinking && !aiError && (
-                            <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-                                <div className="h-2 w-2 rounded-full bg-emerald-400" />
-                                <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest leading-none">Gemini Active</span>
-                            </div>
-                        )}
-                        <select
-                            value={language}
-                            onChange={(e) => setLanguage(e.target.value as any)}
-                            className="appearance-none rounded-lg border border-white/5 bg-slate-800/50 px-3 py-1 text-xs font-semibold text-sky-400 outline-none hover:bg-slate-800 transition-colors"
+                            <div className="hidden sm:block h-4 w-px bg-white/10 mx-1" />
+                            <select
+                                value={language}
+                                onChange={(e) => setLanguage(e.target.value as any)}
+                                className="appearance-none rounded-lg border border-white/5 bg-slate-800/50 px-3 py-1 text-xs font-semibold text-sky-400 outline-none hover:bg-slate-800 transition-colors"
+                            >
+                                {LANGUAGES.map((lang) => (
+                                    <option key={lang} value={lang}>{lang.toUpperCase()}</option>
+                                ))}
+                            </select>
+                            <button
+                                onClick={() => handleAction('run')}
+                                className="flex h-7 items-center gap-2 rounded-lg bg-sky-500 px-4 text-xs font-bold text-white shadow-lg shadow-sky-500/20 hover:bg-sky-400 transition-all active:scale-95"
+                            >
+                                RUN
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Content Area */}
+                    <div className="flex-1 overflow-hidden">
+                        <Group
+                            autoSaveId={`${STORAGE_ID}-inner`}
+                            storage={layoutStorage}
+                            orientation={isVertical ? "vertical" : "horizontal"}
                         >
-                            {LANGUAGES.map((lang) => (
-                                <option key={lang} value={lang}>{lang.toUpperCase()}</option>
-                            ))}
-                        </select>
-                        <button
-                            onClick={() => handleAction('run')}
-                            className="flex h-7 items-center gap-2 rounded-lg bg-sky-500 px-4 text-xs font-bold text-white shadow-lg shadow-sky-500/20 hover:bg-sky-400 transition-all active:scale-95"
-                        >
-                            RUN SECURE
-                        </button>
-                    </div>
-                </header>
-
-                <div className="flex h-10 items-center gap-1 border-b border-white/5 bg-slate-900/20 px-4">
-                    <ToolbarButton onClick={() => handleAction('search')} icon={<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>} />
-                    <div className="h-4 w-px bg-white/10 mx-2" />
-                    <ToolbarButton onClick={() => handleAction('undo')} disabled={!canUndo} icon={<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>} />
-                    <ToolbarButton onClick={() => handleAction('redo')} disabled={!canRedo} icon={<svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 10h-10a8 8 0 00-8 8v2m18-10l-6 6m6-6l-6-6" /></svg>} />
-                </div>
-
-                <div className="relative flex-1 p-6 flex gap-6 overflow-hidden">
-                    <div className="flex-1 glass-card flex flex-col rounded-2xl overflow-hidden border border-white/10 transition-all duration-500 hover:border-sky-500/30">
-                        <div className="flex h-8 items-center bg-white/5 px-4 border-b border-white/5">
-                            <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Workspace</span>
-                            {suggestion && (
-                                <div className="ml-auto flex items-center gap-2">
-                                    <span className="text-[9px] font-bold text-sky-500/70 border border-sky-500/20 px-1.5 rounded uppercase">Tab to accept</span>
-                                    <span className="text-[9px] font-bold text-rose-500/70 border border-rose-500/20 px-1.5 rounded uppercase">Esc to reject</span>
+                            <Panel id="editor" order={1} defaultSize={isVertical ? 60 : 70} minSize={20} className="relative group p-2">
+                                <div className="h-full glass-card rounded-2xl overflow-hidden flex flex-col">
+                                    <div className="flex h-8 items-center bg-white/5 px-4 border-b border-white/5">
+                                        <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Workspace / {language.toUpperCase()}</span>
+                                    </div>
+                                    <div className="flex-1 relative">
+                                        <CodeEditor
+                                            ref={ref}
+                                            value={code}
+                                            onChange={handleCodeChange}
+                                            language={language}
+                                            fontSize={fontSize}
+                                            extensions={[completionExt]}
+                                            className="h-full"
+                                        />
+                                    </div>
                                 </div>
-                            )}
-                        </div>
-                        <div className="flex-1 overflow-hidden relative">
-                            <IsolatedEditor>
-                                <CodeEditor
-                                    ref={ref}
-                                    value={code}
-                                    onChange={handleCodeChange}
-                                    language={language}
-                                    className="h-full"
-                                    minHeight="100%"
-                                    extensions={[completionExt]}
-                                    showDiagnostics={true}
-                                />
-                            </IsolatedEditor>
-                        </div>
-                    </div>
+                            </Panel>
 
-                    <div className="w-80 glass-card flex flex-col rounded-2xl overflow-hidden border border-white/10">
-                        <div className="flex h-8 items-center bg-white/5 px-4 border-b border-white/5">
-                            <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">Output & Intelligence</span>
-                        </div>
-                        <div className="flex-1 p-4 overflow-auto font-mono text-sm relative">
-                            <Sandbox ref={iframeRef} onReady={onReady} className="absolute inset-0 opacity-0 pointer-events-none" />
-                            <div className="space-y-4 relative z-10">
-                                {lastResult !== null && (
-                                    <div className="p-3 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-emerald-400">
-                                        <div className="text-[10px] text-emerald-500/50 uppercase font-bold mb-1">Success</div>
-                                        {JSON.stringify(lastResult, null, 2)}
+                            <Resizer direction={isVertical ? "vertical" : "horizontal"} />
+
+                            <Panel
+                                id="intelligence"
+                                order={2}
+                                defaultSize={isVertical ? 40 : 30}
+                                minSize={15}
+                                className="p-2"
+                            >
+                                <div className="h-full glass-card rounded-2xl overflow-hidden flex flex-col">
+                                    <div className="flex h-8 items-center bg-white/5 px-4 border-b border-white/5">
+                                        <span className="text-[10px] text-slate-500 font-mono uppercase tracking-widest">
+                                            {activeTab === 'settings' ? 'Settings' : 'Execution'}
+                                        </span>
                                     </div>
-                                )}
-                                {lastError && (
-                                    <div className="p-3 rounded-xl bg-rose-500/5 border border-rose-500/10 text-rose-400">
-                                        <div className="text-[10px] text-rose-500/50 uppercase font-bold mb-1">Error</div>
-                                        {lastError}
-                                    </div>
-                                )}
-                                <div className="p-4 rounded-2xl bg-white/5 space-y-3 border border-white/5">
-                                    <div className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-2 flex items-center justify-between">
-                                        <span>Agent Intelligence</span>
-                                        {geminiApiKey && (
-                                            <button
-                                                onClick={() => {
-                                                    const key = prompt('Update Gemini API Key:', geminiApiKey)
-                                                    if (key !== null) setGeminiApiKey(key)
-                                                }}
-                                                className="text-[9px] text-sky-400 hover:underline"
-                                            >
-                                                Change Key
-                                            </button>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Provider</span>
-                                            <span className="text-slate-300 font-bold">Google Gemini</span>
+                                    <div className="flex-1 overflow-auto flex flex-col min-h-0">
+                                        {/* Settings view */}
+                                        <div className={activeTab === 'settings' ? 'block' : 'hidden'}>
+                                            <SettingsPanel settings={settings} onSettingsChange={setSettings} />
                                         </div>
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Model</span>
-                                            <span className="text-slate-300">gemini-2.5-flash</span>
-                                        </div>
-                                        <div className="flex justify-between text-xs">
-                                            <span className="text-slate-500">Status</span>
-                                            {geminiApiKey ? (
-                                                aiError ? (
-                                                    <span className="text-rose-400 font-bold">RATE LIMITED</span>
-                                                ) : (
-                                                    <span className="text-emerald-400 font-bold">CONNECTED</span>
-                                                )
-                                            ) : (
-                                                <span className="text-amber-400 font-bold italic underline cursor-pointer" onClick={() => setIsCommandPaletteOpen(true)}>SETUP REQUIRED</span>
-                                            )}
+
+                                        {/* AI & Sandbox view (Keep mounted!) */}
+                                        <div className={activeTab !== 'settings' ? 'flex flex-col h-full flex-1' : 'hidden'}>
+                                            <div className="h-1/2 min-h-[150px] border-b border-white/5 relative bg-slate-950/20">
+                                                <Sandbox ref={iframeRef} onReady={onReady} />
+                                                {lastResult !== null && (
+                                                    <div className="absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[10px] text-emerald-400 font-mono z-20 overflow-hidden text-ellipsis whitespace-nowrap">
+                                                        RESULT: {JSON.stringify(lastResult)}
+                                                    </div>
+                                                )}
+                                                {lastError && (
+                                                    <div className="absolute bottom-2 left-2 right-2 p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[10px] text-rose-400 font-mono z-20 overflow-hidden text-ellipsis">
+                                                        ERROR: {lastError}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[10px] font-bold text-slate-300 uppercase tracking-widest">AI Status</span>
+                                                    <span className={`text-[9px] font-mono px-1.5 rounded transition-all ${geminiApiKey ? 'bg-sky-500/10 text-sky-400' : 'bg-rose-500/10 text-rose-400'}`}>
+                                                        {geminiApiKey ? 'CONNECTED' : 'UNCONFIGURED'}
+                                                    </span>
+                                                </div>
+                                                {geminiApiKey && (
+                                                    <div className="text-[9px] text-slate-500 bg-white/5 p-3 rounded-xl border border-white/5 leading-relaxed">
+                                                        <span className="text-sky-400 font-bold uppercase tracking-wider block mb-1">Agent Info</span>
+                                                        Using Google Gemini 2.5 Flash for agentic completions.
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
-                                    {aiError && (
-                                        <div className="p-2 rounded-lg bg-rose-500/10 border border-rose-500/20 text-[10px] text-rose-400 animate-in italic leading-tight">
-                                            {aiError.message}
-                                        </div>
-                                    )}
-                                    {geminiApiKey && (
-                                        <div className="text-[9px] text-slate-500 bg-white/5 p-2 rounded-lg border border-white/5">
-                                            <span className="text-sky-400 font-bold uppercase tracking-wider">Pro Tip:</span> Use <kbd className="bg-slate-800 px-1 rounded text-slate-300">Alt + \</kbd> to trigger completion manually and save quota.
-                                        </div>
-                                    )}
-                                    {!geminiApiKey && (
-                                        <p className="text-[10px] text-slate-500 leading-relaxed mt-2 italic">
-                                            Set your Gemini API key in the command palette (CMD+K) to enable real code intelligence.
-                                        </p>
-                                    )}
                                 </div>
-                            </div>
-                        </div>
+                            </Panel>
+                        </Group>
                     </div>
-                </div>
 
-                <footer className="flex h-6 items-center justify-between bg-sky-600 px-4 text-[10px] font-bold uppercase tracking-widest text-white/90">
-                    <div className="flex items-center gap-4">
-                        <span className="flex items-center gap-1">
-                            <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                            INTELLIGENCE ACTIVE
-                        </span>
-                        <span>{code.length} CHARS</span>
-                    </div>
-                    <div className="flex items-center gap-4">
-                        <span>ENVIRONMENT: SANDBOXED</span>
-                        <span>UTF-8</span>
-                    </div>
-                </footer>
-            </main>
+                    {/* Footer */}
+                    <footer className="flex h-6 flex-shrink-0 items-center justify-between bg-sky-600 px-4 text-[10px] font-bold uppercase tracking-widest text-white/90">
+                        <div className="flex items-center gap-4">
+                            <span className="flex items-center gap-1">
+                                <span className={`h-1.5 w-1.5 rounded-full bg-white ${isThinking ? 'animate-pulse' : ''}`} />
+                                {isThinking ? 'THINKING' : 'IDLE'}
+                            </span>
+                            <span className="hidden sm:inline">{code.length} CHARS</span>
+                        </div>
+                        <span className="hidden xs:inline">SANDBOXED EXECUTION</span>
+                    </footer>
+                </main>
+            </Panel>
 
             <CommandPalette
                 isOpen={isCommandPaletteOpen}
                 onClose={() => setIsCommandPaletteOpen(false)}
                 commands={commands}
             />
-        </>
-    )
-}
-
-function ToolbarButton({ onClick, icon, disabled }: { onClick: () => void, icon: React.ReactNode, disabled?: boolean }) {
-    return (
-        <button
-            onClick={onClick}
-            disabled={disabled}
-            className="flex h-7 w-7 items-center justify-center rounded-md text-slate-400 hover:bg-white/10 hover:text-white transition-all active:scale-90 disabled:opacity-20"
-        >
-            {icon}
-        </button>
+        </Group>
     )
 }
 

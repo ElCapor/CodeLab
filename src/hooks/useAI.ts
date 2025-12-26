@@ -30,7 +30,7 @@ export function useAI(apiKey?: string) {
         return () => clearTimeout(timer)
     }, [error])
 
-    const requestSuggestion = useCallback(async (context: string, pos: number, isManual = false) => {
+    const requestSuggestion = useCallback(async (context: string, pos: number, isManual = false, language = 'typescript') => {
         if (!apiKey || context.length < 5) return
         if (error && !isManual) return // Don't auto-retry if in error state
 
@@ -57,10 +57,12 @@ export function useAI(apiKey?: string) {
                 const before = context.slice(0, pos)
                 const after = context.slice(pos)
 
-                // Refined professional prompt
+                // Refined professional prompt with language awareness
                 const prompt = `
-                    You are a professional IDE assistant. Complete the code insertion at the cursor.
+                    You are a professional IDE assistant specialized in ${language}. 
+                    Complete the code insertion at the cursor.
                     
+                    CONTEXT (Language: ${language}):
                     BEFORE CURSOR:
                     ${before}
                     
@@ -69,7 +71,8 @@ export function useAI(apiKey?: string) {
                     
                     INSTRUCTION:
                     - Return ONLY the exact characters to insert.
-                    - No markdown, no commentary.
+                    - No markdown, no commentary, no triple backticks.
+                    - Maintain indentation and style of the existing code.
                     - Be extremely concise.
                     - If no obvious completion, return empty.
                 `

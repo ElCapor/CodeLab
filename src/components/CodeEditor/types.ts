@@ -31,6 +31,8 @@ export interface EditorTheme {
     activeLine?: string
     /** Matching bracket background */
     matchingBracket?: string
+    /** Font size in pixels */
+    fontSize?: number
 }
 
 /**
@@ -75,6 +77,8 @@ export interface CodeEditorProps {
     showAI?: boolean
     /** Whether to show diagnostics (Linter) */
     showDiagnostics?: boolean
+    /** Font size in pixels */
+    fontSize?: number
     /** Custom class name for the container */
     className?: string
     /** Minimum height of the editor */

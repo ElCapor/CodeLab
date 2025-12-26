@@ -43,6 +43,7 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEdito
         highlightActiveLine = true,
         showSearch = true,
         showDiagnostics = true,
+        fontSize,
         className = '',
         minHeight = '200px',
         maxHeight,
@@ -77,7 +78,7 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEdito
             }),
 
             // Theme
-            ...createFullTheme(theme),
+            ...createFullTheme({ ...theme, ...(fontSize !== undefined ? { fontSize } : {}) }),
 
             // Language support
             getLanguageExtension(language),
@@ -122,7 +123,7 @@ const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEdito
         }
         // Only recreate on core prop changes, not value
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [language, readOnly, lineNumbers, lineWrapping, highlightActiveLine, showSearch])
+    }, [language, readOnly, lineNumbers, lineWrapping, highlightActiveLine, showSearch, fontSize])
 
     // Update value when it changes externally
     useEffect(() => {
